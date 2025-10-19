@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ôn Từ Vựng Tiếng Trung</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Ôn Từ Vựng Tiếng Trung</h1>
+        <p>Upload file .xlsx để tạo bài trắc nghiệm (nếu file cũ, sẽ load tiến độ từ localStorage).</p>
+        
+        <input type="file" id="fileUpload" accept=".xlsx">
+        <button id="loadBtn">Tải File Và Bắt Đầu</button>
+        
+        <div id="quizSection" style="display: none;">
+            <h2>Bài Trắc Nghiệm</h2>
+            <div id="question"></div>
+            <div id="options"></div>
+            <button id="skipBtn">Bỏ Qua</button>
+            <button id="nextBtn" style="display: none;">Câu Tiếp Theo</button>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

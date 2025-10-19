@@ -1,0 +1,60 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 600px;
+    margin: auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+h1, h2 {
+    text-align: center;
+}
+
+input[type="file"] {
+    display: block;
+    margin: 10px auto;
+}
+
+button {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 10px 0;
+}
+
+button:hover {
+    background: #0056b3;
+}
+
+#options button {
+    width: 100%;
+    margin: 5px 0;
+    background: #e9ecef;
+    color: black;
+}
+
+#options button.correct {
+    background: #28a745;
+}
+
+#options button.incorrect {
+    background: #dc3545;
+}
+
+#question .word {
+    font-size: 2em; /* Tăng kích cỡ từ cần đoán */
+    font-weight: bold;
+}
