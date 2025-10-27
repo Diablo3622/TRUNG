@@ -1,7 +1,3 @@
-import * as pdfjsLib from 'https://mozilla.github.io/pdf.js/build/pdf.mjs';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://mozilla.github.io/pdf.js/build/pdf.worker.mjs';
-
 let vocabList = []; // Mảng lưu từ vựng với correct và wrong
 const STORAGE_KEY = 'vocabProgress'; // Key cho localStorage
 
@@ -17,70 +13,29 @@ loadBtn.addEventListener('click', loadFile);
 nextBtn.addEventListener('click', generateQuestion);
 skipBtn.addEventListener('click', generateQuestion); // Bỏ qua chỉ next mà không update
 
-// Hàm đọc file .xlsx hoặc .pdf
+// Hàm đọc file .xlsx
 function loadFile() {
     const file = fileUpload.files[0];
     if (!file) {
-        alert('Vui lòng chọn file .xlsx hoặc .pdf');
+        alert('Vui lòng chọn file .xlsx');
         return;
     }
 
     const reader = new FileReader();
-    reader.onload = async function(e) {
-        const data = e.target.result;
-        let newVocab = [];
+    reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-        if (file.name.endsWith('.xlsx')) {
-            // Xử lý XLSX
-            const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-            newVocab = json.slice(1).map(row => ({
-                chinese: row[0],
-                pinyin: row[1],
-                vietnamese: row[2],
-                correct: 0,
-                wrong: 0
-            })).filter(row => row.chinese && row.vietnamese);
-        } else if (file.name.endsWith('.pdf')) {
-            // Xử lý PDF
-            const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(data) });
-            try {
-                const pdf = await loadingTask.promise;
-                const totalPages = pdf.numPages;
-                let fullText = '';
-
-                for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-                    const page = await pdf.getPage(pageNum);
-                    const textContent = await page.getTextContent();
-                    const pageText = textContent.items.map(item => item.str).join(' ');
-                    fullText += pageText + '\n';
-                }
-
-                // Parse text từ PDF: Giả sử mỗi dòng là "chinese pinyin vietnamese" separated by space
-                const lines = fullText.split('\n').filter(line => line.trim());
-                newVocab = lines.map(line => {
-                    const parts = line.trim().split(/\s+/);
-                    if (parts.length >= 3) {
-                        return {
-                            chinese: parts[0],
-                            pinyin: parts[1],
-                            vietnamese: parts.slice(2).join(' '), // Join phần còn lại nếu nghĩa có space
-                            correct: 0,
-                            wrong: 0
-                        };
-                    }
-                    return null;
-                }).filter(row => row && row.chinese && row.vietnamese);
-            } catch (error) {
-                console.error('Lỗi khi đọc PDF:', error);
-                alert('Không thể đọc file PDF. Vui lòng kiểm tra định dạng.');
-                return;
-            }
-        } else {
-            alert('File không hỗ trợ. Chỉ chấp nhận .xlsx hoặc .pdf.');
-            return;
-        }
+        // Xử lý dữ liệu: Bỏ header nếu có
+        const newVocab = json.slice(1).map(row => ({
+            chinese: row[0],
+            pinyin: row[1],
+            vietnamese: row[2],
+            correct: 0,
+            wrong: 0
+        })).filter(row => row.chinese && row.vietnamese);
 
         if (newVocab.length < 4) {
             alert('File cần ít nhất 4 từ vựng hợp lệ.');
@@ -110,8 +65,6 @@ function loadFile() {
         quizSection.style.display = 'block';
         generateQuestion();
     };
-
-    // Đọc file dưới dạng ArrayBuffer cho cả hai loại
     reader.readAsArrayBuffer(file);
 }
 
