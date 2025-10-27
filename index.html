@@ -6,13 +6,15 @@
     <title>Ôn Từ Vựng Tiếng Trung</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.338/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.1/dist/tesseract.min.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>Ôn Từ Vựng Tiếng Trung</h1>
-        <p>Upload file .xlsx để tạo bài trắc nghiệm (nếu file cũ, sẽ load tiến độ từ localStorage).</p>
+        <p>Upload nhiều file (.xlsx, .pdf, .jpg, .png) để tạo bài trắc nghiệm (nếu file cũ, sẽ load tiến độ từ localStorage).</p>
         
-        <input type="file" id="fileUpload" accept=".xlsx">
+        <input type="file" id="fileUpload" multiple accept=".xlsx,.pdf,.jpg,.png,.jpeg">
         <button id="loadBtn">Tải File Và Bắt Đầu</button>
         
         <div id="quizSection" style="display: none;">
