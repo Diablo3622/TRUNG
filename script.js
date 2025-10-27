@@ -1,3 +1,7 @@
+import * as pdfjsLib from 'https://mozilla.github.io/pdf.js/build/pdf.mjs';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://mozilla.github.io/pdf.js/build/pdf.worker.mjs';
+
 let vocabList = []; // Mảng lưu từ vựng với correct và wrong
 const STORAGE_KEY = 'vocabProgress'; // Key cho localStorage
 
@@ -9,141 +13,106 @@ const optionsDiv = document.getElementById('options');
 const nextBtn = document.getElementById('nextBtn');
 const skipBtn = document.getElementById('skipBtn');
 
-loadBtn.addEventListener('click', loadFiles);
+loadBtn.addEventListener('click', loadFile);
 nextBtn.addEventListener('click', generateQuestion);
 skipBtn.addEventListener('click', generateQuestion); // Bỏ qua chỉ next mà không update
 
-// Hàm đọc nhiều file
-async function loadFiles() {
-    const files = fileUpload.files;
-    if (files.length === 0) {
-        alert('Vui lòng chọn ít nhất một file.');
+// Hàm đọc file .xlsx hoặc .pdf
+function loadFile() {
+    const file = fileUpload.files[0];
+    if (!file) {
+        alert('Vui lòng chọn file .xlsx hoặc .pdf');
         return;
     }
 
-    let allVocab = [];
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const data = e.target.result;
+        let newVocab = [];
 
-    for (let file of files) {
-        const fileType = file.name.split('.').pop().toLowerCase();
-        let extractedVocab = [];
-
-        if (fileType === 'xlsx') {
-            extractedVocab = await processXLSX(file);
-        } else if (fileType === 'pdf') {
-            extractedVocab = await processPDF(file);
-        } else if (['jpg', 'jpeg', 'png'].includes(fileType)) {
-            extractedVocab = await processImage(file);
-        } else {
-            alert(`File không hỗ trợ: ${file.name}`);
-            continue;
-        }
-
-        allVocab = allVocab.concat(extractedVocab);
-    }
-
-    if (allVocab.length < 4) {
-        alert('Không đủ từ vựng hợp lệ từ các file.');
-        return;
-    }
-
-    // Loại bỏ duplicate dựa trên chinese
-    const uniqueVocab = [];
-    const seen = new Set();
-    allVocab.forEach(word => {
-        if (!seen.has(word.chinese)) {
-            seen.add(word.chinese);
-            uniqueVocab.push(word);
-        }
-    });
-
-    // Load tiến độ từ localStorage và merge
-    const savedProgress = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-    vocabList = uniqueVocab.map(word => {
-        const key = word.chinese;
-        return {
-            ...word,
-            correct: savedProgress[key]?.correct || 0,
-            wrong: savedProgress[key]?.wrong || 0
-        };
-    });
-
-    // Lọc bỏ từ đã đúng >=50 lần
-    vocabList = vocabList.filter(word => word.correct < 50);
-
-    if (vocabList.length < 4) {
-        alert('Không đủ từ vựng để chơi (có thể nhiều từ đã học xong).');
-        return;
-    }
-
-    // Hiển thị quiz
-    quizSection.style.display = 'block';
-    generateQuestion();
-}
-
-// Xử lý XLSX
-function processXLSX(file) {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
+        if (file.name.endsWith('.xlsx')) {
+            // Xử lý XLSX
+            const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-            const vocab = json.slice(1).map(row => ({
+            newVocab = json.slice(1).map(row => ({
                 chinese: row[0],
                 pinyin: row[1],
-                vietnamese: row[2]
+                vietnamese: row[2],
+                correct: 0,
+                wrong: 0
             })).filter(row => row.chinese && row.vietnamese);
+        } else if (file.name.endsWith('.pdf')) {
+            // Xử lý PDF
+            const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(data) });
+            try {
+                const pdf = await loadingTask.promise;
+                const totalPages = pdf.numPages;
+                let fullText = '';
 
-            resolve(vocab);
-        };
-        reader.readAsArrayBuffer(file);
-    });
-}
+                for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                    const page = await pdf.getPage(pageNum);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    fullText += pageText + '\n';
+                }
 
-// Xử lý PDF
-async function processPDF(file) {
-    const reader = new FileReader();
-    reader.readAsArrayBuffer(file);
-    await new Promise(resolve => reader.onload = resolve);
-
-    const pdf = await pdfjsLib.getDocument({ data: reader.result }).promise;
-    let text = '';
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        text += content.items.map(item => item.str).join(' ') + '\n';
-    }
-
-    return parseTextToVocab(text);
-}
-
-// Xử lý Image (OCR)
-async function processImage(file) {
-    const url = URL.createObjectURL(file);
-    const { data: { text } } = await Tesseract.recognize(url, 'chi_sim+eng+vie', { // Hỗ trợ Trung, Anh (cho pinyin), Việt
-        logger: m => console.log(m)
-    });
-    URL.revokeObjectURL(url);
-    return parseTextToVocab(text);
-}
-
-// Parse text thành vocab (giả sử mỗi dòng: Chinese Pinyin Vietnamese, split by space)
-function parseTextToVocab(text) {
-    const lines = text.split('\n').filter(line => line.trim());
-    return lines.map(line => {
-        const parts = line.trim().split(/\s+/);
-        if (parts.length >= 3) {
-            return {
-                chinese: parts[0],
-                pinyin: parts[1],
-                vietnamese: parts.slice(2).join(' ')
-            };
+                // Parse text từ PDF: Giả sử mỗi dòng là "chinese pinyin vietnamese" separated by space
+                const lines = fullText.split('\n').filter(line => line.trim());
+                newVocab = lines.map(line => {
+                    const parts = line.trim().split(/\s+/);
+                    if (parts.length >= 3) {
+                        return {
+                            chinese: parts[0],
+                            pinyin: parts[1],
+                            vietnamese: parts.slice(2).join(' '), // Join phần còn lại nếu nghĩa có space
+                            correct: 0,
+                            wrong: 0
+                        };
+                    }
+                    return null;
+                }).filter(row => row && row.chinese && row.vietnamese);
+            } catch (error) {
+                console.error('Lỗi khi đọc PDF:', error);
+                alert('Không thể đọc file PDF. Vui lòng kiểm tra định dạng.');
+                return;
+            }
+        } else {
+            alert('File không hỗ trợ. Chỉ chấp nhận .xlsx hoặc .pdf.');
+            return;
         }
-        return null;
-    }).filter(Boolean);
+
+        if (newVocab.length < 4) {
+            alert('File cần ít nhất 4 từ vựng hợp lệ.');
+            return;
+        }
+
+        // Load tiến độ từ localStorage và merge
+        const savedProgress = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+        vocabList = newVocab.map(word => {
+            const key = word.chinese; // Sử dụng từ Trung làm key unique
+            return {
+                ...word,
+                correct: savedProgress[key]?.correct || 0,
+                wrong: savedProgress[key]?.wrong || 0
+            };
+        });
+
+        // Lọc bỏ từ đã đúng >=50 lần
+        vocabList = vocabList.filter(word => word.correct < 50);
+
+        if (vocabList.length < 4) {
+            alert('Không đủ từ vựng để chơi (có thể nhiều từ đã học xong).');
+            return;
+        }
+
+        // Hiển thị quiz
+        quizSection.style.display = 'block';
+        generateQuestion();
+    };
+
+    // Đọc file dưới dạng ArrayBuffer cho cả hai loại
+    reader.readAsArrayBuffer(file);
 }
 
 // Tạo câu hỏi ngẫu nhiên (vô tận, không giới hạn)
